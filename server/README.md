@@ -17,8 +17,8 @@ server/
 
 ### Purpose
 
-- `config/` - environment and database setup
-- `controllers/` - request handlers
+- `config/` - environment and database setup.
+- `controllers/` - request handlers.
 - `middleware/` - auth, error handling, request validation
 - `models/` - Mongoose schemas and models
 - `routes/` - route definitions
