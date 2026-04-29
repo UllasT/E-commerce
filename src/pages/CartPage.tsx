@@ -1,9 +1,24 @@
 import { Link } from 'react-router-dom';
 import { Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function CartPage() {
   const { items, removeFromCart, updateQuantity, cartTotal, loading } = useCart();
+  const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <div className="page container">
+        <div className="empty-state">
+          <ShoppingBag size={48} />
+          <h2>Please sign in</h2>
+          <p>You need to be logged in to view your cart</p>
+          <Link to="/login" className="btn btn-primary">Sign In</Link>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return <div className="spinner" />;
   if (items.length === 0) {

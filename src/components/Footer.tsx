@@ -21,9 +21,10 @@ export default function Footer() {
           <div>
             <h3>Account</h3>
             <ul>
-              <li><Link to="/wishlist">Wishlist</Link></li>
+              <li><Link to="/dashboard">My Account</Link></li>
+              <li><Link to="/orders">Orders</Link></li>
               <li><Link to="/cart">Cart</Link></li>
-              <li><Link to="/checkout">Checkout</Link></li>
+              <li><Link to="/wishlist">Wishlist</Link></li>
             </ul>
           </div>
           <div>

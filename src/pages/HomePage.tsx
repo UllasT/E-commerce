@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import type { Product, Category } from '../types';
 import ProductCard from '../components/ProductCard';
-import { getCategories, getFeaturedProducts } from '../lib/localStore';
 
 export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -11,9 +11,16 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setCategories(getCategories());
-    setFeatured(getFeaturedProducts() as (Product & { category: Category })[]);
-    setLoading(false);
+    async function fetchData() {
+      const [catRes, prodRes] = await Promise.all([
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('products').select('*, category:categories(*)').eq('featured', true).limit(8),
+      ]);
+      setCategories(catRes.data ?? []);
+      setFeatured(prodRes.data as (Product & { category: Category })[] ?? []);
+      setLoading(false);
+    }
+    fetchData();
   }, []);
 
   if (loading) return <div className="spinner" />;

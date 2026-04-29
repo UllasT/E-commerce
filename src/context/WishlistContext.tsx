@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 import type { WishlistItem, Product } from '../types';
-import { createId, getProductById, getWishlistStore, saveWishlistStore } from '../lib/localStore';
 
 interface WishlistContextType {
   items: WishlistItem[];
@@ -14,37 +15,29 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 export function WishlistProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const guestId = 'guest';
+  const { user } = useAuth();
 
   const fetchWishlist = async () => {
+    if (!user) { setItems([]); return; }
     setLoading(true);
-    const wishlist = getWishlistStore()[guestId] ?? [];
-    setItems(
-      wishlist
-        .map((item: { id: string; user_id: string; product_id: string; created_at: string }) => {
-          const product = getProductById(item.product_id);
-          return product ? { ...item, product } : null;
-        })
-        .filter(Boolean) as (WishlistItem & { product: Product })[]
-    );
+    const { data } = await supabase
+      .from('wishlist_items')
+      .select('*, product:products(*)')
+      .eq('user_id', user.id);
+    setItems((data as (WishlistItem & { product: Product })[]) ?? []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchWishlist(); }, []);
+  useEffect(() => { fetchWishlist(); }, [user]);
 
   const toggleWishlist = async (productId: string) => {
+    if (!user) return;
     const existing = items.find(i => i.product_id === productId);
-    const wishlistStore = getWishlistStore();
     if (existing) {
-      wishlistStore[guestId] = (wishlistStore[guestId] ?? []).filter((item: { id: string }) => item.id !== existing.id);
-      saveWishlistStore(wishlistStore);
+      await supabase.from('wishlist_items').delete().eq('id', existing.id);
       setItems(prev => prev.filter(i => i.id !== existing.id));
     } else {
-      wishlistStore[guestId] = [
-        ...(wishlistStore[guestId] ?? []),
-        { id: createId('wish'), user_id: guestId, product_id: productId, created_at: new Date().toISOString() },
-      ];
-      saveWishlistStore(wishlistStore);
+      await supabase.from('wishlist_items').insert({ user_id: user.id, product_id: productId });
       fetchWishlist();
     }
   };

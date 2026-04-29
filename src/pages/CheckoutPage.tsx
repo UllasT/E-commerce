@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { CreditCard, Truck, Banknote, CircleCheck as CheckCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import type { Address } from '../types';
-import { createId, getAddressStore, getOrderStore, saveAddressStore, saveOrderStore } from '../lib/localStore';
 
 export default function CheckoutPage() {
   const { items, cartTotal, clearCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -24,13 +26,29 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    const stored = getAddressStore().guest ?? [];
-    setAddresses(stored as Address[]);
-    if (stored.length > 0) {
-      const defaultAddr = stored.find(a => a.is_default);
-      setSelectedAddress((defaultAddr ?? stored[0]).id);
+    if (user) {
+      supabase.from('addresses').select('*').eq('user_id', user.id).order('is_default', { ascending: false })
+        .then(({ data }) => {
+          setAddresses((data as Address[]) ?? []);
+          if (data && data.length > 0) {
+            const defaultAddr = data.find(a => a.is_default);
+            setSelectedAddress((defaultAddr ?? data[0]).id);
+          }
+        });
     }
-  }, []);
+  }, [user]);
+
+  if (!user) {
+    return (
+      <div className="page container">
+        <div className="empty-state">
+          <h2>Please sign in</h2>
+          <p>You need to be logged in to checkout</p>
+          <Link to="/login" className="btn btn-primary">Sign In</Link>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0 && !orderPlaced) {
     navigate('/cart');
@@ -41,20 +59,16 @@ export default function CheckoutPage() {
   const total = cartTotal + shipping;
 
   const handleAddAddress = async () => {
-    const address: Address = {
-      id: createId('addr'),
-      user_id: 'guest',
-      ...newAddress,
-      is_default: addresses.length === 0,
-      created_at: new Date().toISOString(),
-    };
-    const stored = getAddressStore();
-    stored.guest = [...(stored.guest ?? []), address];
-    saveAddressStore(stored);
-    setAddresses(prev => [...prev, address]);
-    setSelectedAddress(address.id);
-    setShowNewAddress(false);
-    setNewAddress({ full_name: '', phone: '', address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'India' });
+    if (!user) return;
+    const { data } = await supabase.from('addresses').insert({
+      ...newAddress, user_id: user.id, is_default: addresses.length === 0,
+    }).select().maybeSingle();
+    if (data) {
+      setAddresses(prev => [...prev, data as Address]);
+      setSelectedAddress(data.id);
+      setShowNewAddress(false);
+      setNewAddress({ full_name: '', phone: '', address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'India' });
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -64,39 +78,30 @@ export default function CheckoutPage() {
     const addr = addresses.find(a => a.id === selectedAddress);
     const num = `SK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-    const orderId = createId('order');
-    const orderItems = items.map(item => ({
-      id: createId('order_item'),
-      order_id: orderId,
-      product_id: item.product_id,
-      product_name: item.product?.name ?? '',
-      product_image: item.product?.image_url ?? '',
-      price: item.product?.price ?? 0,
-      quantity: item.quantity,
-      created_at: new Date().toISOString(),
-    }));
+    const { data: order, error } = await supabase.from('orders').insert({
+      user_id: user.id,
+      order_number: num,
+      total_amount: total,
+      shipping_address: addr as unknown as Record<string, unknown>,
+      payment_method: paymentMethod,
+      payment_status: paymentMethod === 'cod' ? 'pending' : 'paid',
+    }).select().maybeSingle();
 
-    const orders = getOrderStore();
-    orders.guest = [
-      ...(orders.guest ?? []),
-      {
-        id: orderId,
-        user_id: 'guest',
-        order_number: num,
-        status: 'pending',
-        total_amount: total,
-        shipping_address: addr as unknown as Record<string, unknown>,
-        payment_method: paymentMethod,
-        payment_status: paymentMethod === 'cod' ? 'pending' : 'paid',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        order_items: orderItems,
-      },
-    ];
-    saveOrderStore(orders);
-    await clearCart();
-    setOrderNumber(num);
-    setOrderPlaced(true);
+    if (!error && order) {
+      const orderItems = items.map(item => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        product_name: item.product?.name ?? '',
+        product_image: item.product?.image_url ?? '',
+        price: item.product?.price ?? 0,
+        quantity: item.quantity,
+      }));
+
+      await supabase.from('order_items').insert(orderItems);
+      await clearCart();
+      setOrderNumber(num);
+      setOrderPlaced(true);
+    }
 
     setLoading(false);
   };
@@ -113,9 +118,10 @@ export default function CheckoutPage() {
             Your order <strong>{orderNumber}</strong> has been placed successfully.
           </p>
           <p style={{ color: 'var(--neutral-500)', marginBottom: 32 }}>
-            Your order has been saved locally in this browser.
+            You can track your order in the Orders section.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Link to="/orders" className="btn btn-primary">View Orders</Link>
             <Link to="/products" className="btn btn-secondary">Continue Shopping</Link>
           </div>
         </div>

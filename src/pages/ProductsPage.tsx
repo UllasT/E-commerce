@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import type { Product, Category } from '../types';
 import ProductCard from '../components/ProductCard';
-import { getCategories, getCategoryBySlug, getProducts } from '../lib/localStore';
 
 const PRICE_RANGES = [
   { label: 'Under 500', min: 0, max: 500 },
@@ -23,25 +23,28 @@ export default function ProductsPage() {
   const selectedPriceRanges = searchParams.get('price')?.split(',').filter(Boolean) || [];
 
   useEffect(() => {
-    setCategories(getCategories());
+    supabase.from('categories').select('*').order('name').then(({ data }) => setCategories(data ?? []));
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    let result = getProducts();
+    async function fetchProducts() {
+      setLoading(true);
+      let query = supabase.from('products').select('*, category:categories(*)');
 
-    if (selectedCategory) {
-      const category = getCategoryBySlug(selectedCategory);
-      result = category ? result.filter(product => product.category_id === category.id) : [];
+      if (selectedCategory) {
+        const { data: catData } = await supabase.from('categories').select('id').eq('slug', selectedCategory).maybeSingle();
+        if (catData) query = query.eq('category_id', catData.id);
+      }
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      const { data } = await query.order('created_at', { ascending: false });
+      setProducts((data as (Product & { category: Category })[]) ?? []);
+      setLoading(false);
     }
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(product => product.name.toLowerCase().includes(query) || product.description.toLowerCase().includes(query));
-    }
-
-    setProducts(result as (Product & { category: Category })[]);
-    setLoading(false);
+    fetchProducts();
   }, [selectedCategory, searchQuery]);
 
   const filteredProducts = useMemo(() => {

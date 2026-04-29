@@ -2,11 +2,26 @@ import { Link } from 'react-router-dom';
 import { Heart, ShoppingCart } from 'lucide-react';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { Star } from 'lucide-react';
 
 export default function WishlistPage() {
   const { items, toggleWishlist, loading } = useWishlist();
   const { addToCart } = useCart();
+  const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <div className="page container">
+        <div className="empty-state">
+          <Heart size={48} />
+          <h2>Please sign in</h2>
+          <p>You need to be logged in to view your wishlist</p>
+          <Link to="/login" className="btn btn-primary">Sign In</Link>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return <div className="spinner" />;
   if (items.length === 0) {
