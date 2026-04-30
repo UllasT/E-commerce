@@ -31,3 +31,20 @@ server/
 - `src/index.ts` - starts the server
 - `src/config/db.ts` - connects to MongoDB
 - `src/routes/index.ts` - combines all route modules
+
+
+```sql
+	use ecommerce;
+	SET FOREIGN_KEY_CHECKS = 0;
+	TRUNCATE TABLE order_items;
+	TRUNCATE TABLE orders;
+	TRUNCATE TABLE cart_items;
+	TRUNCATE TABLE wishlist_items;
+	TRUNCATE TABLE addresses;
+	TRUNCATE TABLE users;
+	TRUNCATE TABLE products;
+	TRUNCATE TABLE categories;
+	SET FOREIGN_KEY_CHECKS = 1;
+
+
+```
