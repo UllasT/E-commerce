@@ -11,7 +11,8 @@ export const MYSQL_CONFIG = {
   queueLimit: 0
 };
 
-
+export const DATABASE_TYPE = process.env.DATA_BASE_TYPE;
+export const JWT_SECRET = process.env.JWT_SECRET;
 export const MONGODB_CONFIG = {
   uri: process.env.MONGO_URI || 'mongodb://localhost:27017/ecommerce',
 };

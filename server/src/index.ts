@@ -14,7 +14,9 @@ app.use(express.urlencoded({ extended: true }))
 
 
 
-// // Import routes
+// Import routes SQL
+import userRoutesSql from './routes/user.routes.js'
+app.use('/api/users', userRoutesSql)
 // import productRoutes from './routes/productRoutes'
 // import categoryRoutes from './routes/categoryRoutes'
 // import userRoutes from './routes/userRoutes'
