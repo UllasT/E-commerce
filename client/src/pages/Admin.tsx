@@ -1,0 +1,451 @@
+import { useEffect, useState } from 'react';
+import { Plus, X, Trash2, Edit2, Loader } from 'lucide-react';
+import type { Product, Category } from '../types';
+
+// Sample Data
+const SAMPLE_CATEGORIES: Category[] = [
+  { id: '1', name: 'Electronics', slug: 'electronics', image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500', description: 'Electronic devices', created_at: new Date().toISOString() },
+  { id: '2', name: 'Fashion', slug: 'fashion', image_url: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=500', description: 'Fashion items', created_at: new Date().toISOString() },
+];
+
+const SAMPLE_PRODUCTS: Product[] = [
+  {
+    id: '1',
+    name: 'iPhone 15 Pro',
+    slug: 'iphone-15-pro',
+    description: 'Latest iPhone with A17 Pro chip and advanced camera system',
+    price: 99999,
+    compare_price: 129999,
+    image_url: 'https://images.unsplash.com/photo-1592286927505-1def25115558?w=500',
+    category_id: '1',
+    rating: 4.5,
+    review_count: 128,
+    stock: 45,
+    featured: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    name: 'Sony WH-1000XM5',
+    slug: 'sony-wh-1000xm5',
+    description: 'Noise-canceling wireless headphones',
+    price: 29999,
+    compare_price: 34999,
+    image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500',
+    category_id: '1',
+    rating: 4.8,
+    review_count: 256,
+    stock: 32,
+    featured: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '3',
+    name: 'MacBook Pro 14"',
+    slug: 'macbook-pro-14',
+    description: 'Powerful laptop with M3 chip',
+    price: 199999,
+    compare_price: 219999,
+    image_url: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500',
+    category_id: '1',
+    rating: 4.9,
+    review_count: 89,
+    stock: 18,
+    featured: false,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '4',
+    name: 'Premium Cotton T-Shirt',
+    slug: 'premium-cotton-tshirt',
+    description: 'Comfortable and durable 100% cotton t-shirt',
+    price: 499,
+    compare_price: 799,
+    image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500',
+    category_id: '2',
+    rating: 4.3,
+    review_count: 342,
+    stock: 200,
+    featured: false,
+    created_at: new Date().toISOString(),
+  },
+];
+
+export default function Admin() {
+  const [products, setProducts] = useState<Product[]>(SAMPLE_PRODUCTS);
+  const [categories, setCategories] = useState<Category[]>(SAMPLE_CATEGORIES);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    price: '',
+    compare_price: '',
+    image_url: '',
+    category_id: '',
+    stock: '',
+    featured: false,
+  });
+
+  useEffect(() => {
+    // Sample data loaded, no need to fetch
+  }, []);
+
+  const handleOpenModal = (product: Product | null = null) => {
+    if (product) {
+      setEditingProduct(product);
+      setFormData({
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        price: String(product.price),
+        compare_price: String(product.compare_price || ''),
+        image_url: product.image_url,
+        category_id: product.category_id,
+        stock: String(product.stock),
+        featured: product.featured,
+      });
+    } else {
+      setEditingProduct(null);
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        price: '',
+        compare_price: '',
+        image_url: '',
+        category_id: '',
+        stock: '',
+        featured: false,
+      });
+    }
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingProduct(null);
+    setFormData({
+      name: '',
+      slug: '',
+      description: '',
+      price: '',
+      compare_price: '',
+      image_url: '',
+      category_id: '',
+      stock: '',
+      featured: false,
+    });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target as any;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const payload = {
+        ...formData,
+        price: parseFloat(formData.price),
+        compare_price: formData.compare_price ? parseFloat(formData.compare_price) : null,
+        stock: parseInt(formData.stock),
+      };
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      if (editingProduct) {
+        // Update product in state
+        setProducts(products.map(p => p.id === editingProduct.id ? { ...payload, id: p.id, created_at: p.created_at, rating: p.rating, review_count: p.review_count } as Product : p));
+        setMessage({ type: 'success', text: 'Product updated successfully!' });
+      } else {
+        // Create new product
+        const newProduct: Product = {
+          ...payload,
+          id: Date.now().toString(),
+          created_at: new Date().toISOString(),
+          rating: 0,
+          review_count: 0,
+        } as Product;
+        setProducts([newProduct, ...products]);
+        setMessage({ type: 'success', text: 'Product added successfully!' });
+      }
+      
+      handleCloseModal();
+      setTimeout(() => setMessage(null), 2000);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setMessage({ type: 'error', text: 'Error saving product. Please try again.' });
+      setTimeout(() => setMessage(null), 2000);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+
+    try {
+      setProducts(products.filter(p => p.id !== productId));
+      setMessage({ type: 'success', text: 'Product deleted successfully!' });
+      setTimeout(() => setMessage(null), 2000);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      setMessage({ type: 'error', text: 'Error deleting product.' });
+      setTimeout(() => setMessage(null), 2000);
+    }
+  };
+
+  if (loading) {
+    return <div className="admin-page loading"><div className="spinner" /></div>;
+  }
+
+  return (
+    <div className="admin-page">
+      <div className="admin-container">
+        {/* Header */}
+        <div className="admin-header">
+          <div>
+            <h1>Product Management</h1>
+            <p>Manage your uploaded products</p>
+          </div>
+          <button 
+            className="admin-header-button"
+            onClick={() => handleOpenModal()}
+          >
+            <Plus size={18} /> Add Product
+          </button>
+        </div>
+
+        {/* Message Alert */}
+        {message && (
+          <div className={`alert alert-${message.type}`}>
+            {message.text}
+          </div>
+        )}
+
+        {/* Products Grid */}
+        <div className="admin-products">
+          {products.length === 0 ? (
+            <div className="empty-state-admin">
+              <p>No products yet. Click "Add Product" to get started!</p>
+            </div>
+          ) : (
+            <div className="admin-products-grid">
+              {products.map(product => (
+                <div key={product.id} className="admin-product-card">
+                  <div className="admin-product-image">
+                    <img src={product.image_url} alt={product.name} />
+                    {product.featured && <span className="featured-badge">Featured</span>}
+                  </div>
+                  <div className="admin-product-info">
+                    <h3>{product.name}</h3>
+                    <p className="description">{product.description?.substring(0, 80)}...</p>
+                    <div className="product-meta">
+                      <div>
+                        <span className="label">Price</span>
+                        <span className="value">₹{product.price}</span>
+                      </div>
+                      <div>
+                        <span className="label">Stock</span>
+                        <span className="value">{product.stock}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="admin-product-actions">
+                    <button
+                      onClick={() => handleOpenModal(product)}
+                      title="Edit product"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      className="btn-danger"
+                      onClick={() => handleDeleteProduct(product.id)}
+                      title="Delete product"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add/Edit Product Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
+              <button className="modal-close" onClick={handleCloseModal}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="modal-form">
+              <div>
+                <label htmlFor="name">Product Name *</label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="e.g., iPhone 15 Pro"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="slug">Slug *</label>
+                <input
+                  type="text"
+                  id="slug"
+                  name="slug"
+                  value={formData.slug}
+                  onChange={handleInputChange}
+                  placeholder="e.g., iphone-15-pro"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="description">Description</label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Product description..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="form-row">
+                <div>
+                  <label htmlFor="price">Price (₹) *</label>
+                  <input
+                    type="number"
+                    id="price"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    step="0.01"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="compare_price">Compare Price (₹)</label>
+                  <input
+                    type="number"
+                    id="compare_price"
+                    name="compare_price"
+                    value={formData.compare_price}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div>
+                  <label htmlFor="stock">Stock *</label>
+                  <input
+                    type="number"
+                    id="stock"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleInputChange}
+                    placeholder="0"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="category_id">Category</label>
+                  <select
+                    id="category_id"
+                    name="category_id"
+                    value={formData.category_id}
+                    onChange={handleInputChange}
+                  >
+                    <option value="">Select a category</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="image_url">Image URL *</label>
+                <input
+                  type="url"
+                  id="image_url"
+                  name="image_url"
+                  value={formData.image_url}
+                  onChange={handleInputChange}
+                  placeholder="https://example.com/image.jpg"
+                  required
+                />
+              </div>
+
+              <div className="form-group-checkbox">
+                <input
+                  type="checkbox"
+                  id="featured"
+                  name="featured"
+                  checked={formData.featured}
+                  onChange={handleInputChange}
+                />
+                <label htmlFor="featured">Mark as Featured</label>
+              </div>
+
+              {formData.image_url && (
+                <div className="image-preview">
+                  <label>Image Preview:</label>
+                  <img src={formData.image_url} alt="Preview" onError={() => {}} />
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={handleCloseModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={submitting}>
+                  {submitting ? (
+                    <span className="btn-spinner">
+                      <Loader size={16} className="spinner-icon" /> Saving...
+                    </span>
+                  ) : (
+                    editingProduct ? 'Update Product' : 'Add Product'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

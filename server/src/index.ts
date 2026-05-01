@@ -3,20 +3,27 @@ import cors from 'cors'
 import 'dotenv/config'
 import DbConnectionSql from './db/index.js'
 import { ConnectionMongoDB } from './db/mdb/index.js'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-
-
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-
+// Serve static files from public folder
+app.use(express.static(path.join(__dirname, 'public')))
 
 // Import routes SQL
-import userRoutesSql from './routes/user.routes.js'
-app.use('/api/users', userRoutesSql)
+import userRoutes from './routes/user.routes.js'
+import categoryRoutes from './routes/catagorie.routes.js'
+import productRoutes from './routes/product.routes.js'
+app.use('/api/users', userRoutes)
+app.use('/api/categories', categoryRoutes)
+app.use('/api/products', productRoutes)
 // import productRoutes from './routes/productRoutes'
 // import categoryRoutes from './routes/categoryRoutes'
 // import userRoutes from './routes/userRoutes'
