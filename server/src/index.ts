@@ -21,13 +21,18 @@ app.use(express.static(path.join(__dirname, 'public')))
 import userRoutes from './routes/user.routes.js'
 import categoryRoutes from './routes/catagorie.routes.js'
 import productRoutes from './routes/product.routes.js'
+import wishlistRoutes from './routes/wishlist.routes.js'
+import cartRoutes from './routes/cart.routes.js'
+import addressRoutes from './routes/address.routes.js'
+import orderRoutes from './routes/order.routes.js'
 app.use('/api/users', userRoutes)
 app.use('/api/categories', categoryRoutes)
 app.use('/api/products', productRoutes)
-// import productRoutes from './routes/productRoutes'
-// import categoryRoutes from './routes/categoryRoutes'
-// import userRoutes from './routes/userRoutes'
-// import orderRoutes from './routes/orderRoutes'
+app.use('/api/wishlist', wishlistRoutes)
+app.use('/api/cart', cartRoutes)
+app.use('/api/addresses', addressRoutes)
+app.use('/api/orders', orderRoutes)
+
 
 
 if (process.env.DATA_BASE_TYPE === 'sql') {

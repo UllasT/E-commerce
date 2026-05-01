@@ -19,7 +19,12 @@ const productSchema = new mongoose.Schema({
   review_count: { type: Number, default: 0 },
   stock: { type: Number, default: 0 },
 
-  featured: { type: Boolean, default: false }
+  featured: { type: Boolean, default: false },
+  userid: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
 
 }, { timestamps: true });
 

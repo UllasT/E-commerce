@@ -48,3 +48,12 @@ server/
 
 
 ```
+
+
+
+
+connect ECONNREFUSED 127.0.0.1:27017, connect ECONNREFUSED ::1:27017
+
+Windows:Press Win + R, type services.msc, and hit Enter.
+Find MongoDB Server (or MongoDB) in the list.
+If the status isn't "Running," right-click it and select Start
