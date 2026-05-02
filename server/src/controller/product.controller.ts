@@ -8,7 +8,7 @@ import categorySchema from "../models/category.schema.js";
 
 
 const CreateProduct = async (req: any, res: any) => {
-    const{ name, description, price, category_id,stock } = req.body;
+    const{ name, description, price, category_id,stock,image_url } = req.body;
     if (!name) return res.status(400).json({ message: "Name is required" });
     if (!description) return res.status(400).json({ message: "Description is required" });
     if (!price) return res.status(400).json({ message: "Price is required" });
@@ -31,8 +31,8 @@ const CreateProduct = async (req: any, res: any) => {
                 uniqname = `${name}-${uniqueSuffix}`;
             }
             const [result]: any = await pool.execute(
-                'INSERT INTO products (name, description, price, category_id, slug,userid, stock) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [name, description, price, category_id, uniqname.toLowerCase().replace(/[^a-z0-9]+/g, '-'), userId, stock]
+                'INSERT INTO products (name, description, price, category_id, slug,userid, stock, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [name, description, price, category_id, uniqname.toLowerCase().replace(/[^a-z0-9]+/g, '-'), userId, stock, image_url || '']
             );
             res.status(201).json({ message: "Product created", productId: result.insertId });
         } catch (error) {
@@ -55,7 +55,8 @@ const CreateProduct = async (req: any, res: any) => {
         category_id,
         slug,
         userid: userId,
-        stock
+        stock,
+        image_url: image_url || ''
     });
     res.status(201).json({ message: "Product created", productId: newProduct._id });
 
@@ -67,7 +68,7 @@ const CreateProduct = async (req: any, res: any) => {
 
 const UpdateProduct = async (req: any, res: any) => {
     const { id } = req.params;
-    const { name, description, price, category_id, stock } = req.body;
+    const { name, description, price, category_id, stock, image_url } = req.body;
     if (!id) return res.status(400).json({ message: "Product ID is required" });
     if (DATABASE_TYPE === 'sql') {
         try {
@@ -79,8 +80,8 @@ const UpdateProduct = async (req: any, res: any) => {
             console.log(rows);
             console.log('====================================');
             await pool.execute(
-                'UPDATE products SET name = ?, description = ?, price = ?, category_id = ?, stock = ? WHERE id = ?',
-                [name || rows[0].name, description || rows[0].description, price || rows[0].price, category_id || rows[0].category_id, stock || rows[0].stock,   id]
+                'UPDATE products SET name = ?, description = ?, price = ?, category_id = ?, stock = ?, image_url = ? WHERE id = ?',
+                [name || rows[0].name, description || rows[0].description, price || rows[0].price, category_id || rows[0].category_id, stock || rows[0].stock, image_url || rows[0].image_url, id]
             );
             res.status(200).json({ message: "Product updated" });
         } catch (error) {
@@ -95,7 +96,8 @@ const UpdateProduct = async (req: any, res: any) => {
             product.description = description || product.description;
             product.price = price || product.price;
             product.category_id = category_id || product.category_id;
-            product.stock = stock || product.stock; 
+            product.stock = stock || product.stock;
+            product.image_url = image_url || product.image_url;
             await product.save();
             res.status(200).json({ message: "Product updated" });
         } catch (error) {

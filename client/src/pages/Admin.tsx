@@ -4,79 +4,10 @@ import type { Product, Category } from '../types';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
-// Sample Data
-const SAMPLE_CATEGORIES: Category[] = [
-  { id: '1', name: 'Electronics', slug: 'electronics', image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500', description: 'Electronic devices', created_at: new Date().toISOString() },
-  { id: '2', name: 'Fashion', slug: 'fashion', image_url: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=500', description: 'Fashion items', created_at: new Date().toISOString() },
-];
-
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    name: 'iPhone 15 Pro',
-    slug: 'iphone-15-pro',
-    description: 'Latest iPhone with A17 Pro chip and advanced camera system',
-    price: 99999,
-    compare_price: 129999,
-    image_url: 'https://images.unsplash.com/photo-1592286927505-1def25115558?w=500',
-    category_id: '1',
-    rating: 4.5,
-    review_count: 128,
-    stock: 45,
-    featured: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Sony WH-1000XM5',
-    slug: 'sony-wh-1000xm5',
-    description: 'Noise-canceling wireless headphones',
-    price: 29999,
-    compare_price: 34999,
-    image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500',
-    category_id: '1',
-    rating: 4.8,
-    review_count: 256,
-    stock: 32,
-    featured: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    name: 'MacBook Pro 14"',
-    slug: 'macbook-pro-14',
-    description: 'Powerful laptop with M3 chip',
-    price: 199999,
-    compare_price: 219999,
-    image_url: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500',
-    category_id: '1',
-    rating: 4.9,
-    review_count: 89,
-    stock: 18,
-    featured: false,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    name: 'Premium Cotton T-Shirt',
-    slug: 'premium-cotton-tshirt',
-    description: 'Comfortable and durable 100% cotton t-shirt',
-    price: 499,
-    compare_price: 799,
-    image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500',
-    category_id: '2',
-    rating: 4.3,
-    review_count: 342,
-    stock: 200,
-    featured: false,
-    created_at: new Date().toISOString(),
-  },
-];
-
 export default function Admin() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>(SAMPLE_CATEGORIES);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -99,10 +30,18 @@ export default function Admin() {
     if (!user) return;
     (async () => {
       try {
-        const res = await api.get('products/user');
-        setProducts(res.data ?? []);
+        // Fetch categories
+        const catRes = await api.get('categories');
+        const fetchedCategories = catRes.data.catagories || catRes.data 
+ ;
+        setCategories(fetchedCategories);
+
+        // Fetch products
+        const prodRes = await api.get('products/user');
+        setProducts(prodRes.data ?? []);
       } catch (err) {
-        console.error('Error fetching products:', err);
+        console.error('Error fetching data:', err);
+        setCategories([]);
         setProducts([]);
       } finally {
         setLoading(false);
@@ -176,6 +115,7 @@ export default function Admin() {
         price: parseFloat(formData.price),
         category_id: formData.category_id,
         stock: parseInt(formData.stock),
+        image_url: formData.image_url,
       };
 
       if (editingProduct) {
@@ -184,12 +124,11 @@ export default function Admin() {
         setMessage({ type: 'success', text: 'Product updated successfully!' });
       } else {
         const res = await api.post('products/create', payload);
-        const newProduct: Product =         {
-          id: res.data?.productId ?? Date.now().toString(),
+        const newProduct: Product = {
+          id: res.data?.productId ?? res.data?._id ?? res.data?.id ?? Date.now().toString(),
           ...payload,
-          compare_price: null,  // Changed from undefined to null
+          compare_price: formData.compare_price ? parseFloat(formData.compare_price) : null,
           slug: formData.slug,
-          image_url: formData.image_url,
           rating: 0,
           review_count: 0,
           featured: formData.featured,
@@ -418,11 +357,14 @@ export default function Admin() {
                     onChange={handleInputChange}
                   >
                     <option value="">Select a category</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
+                    {categories &&categories.map(cat => {
+                      const catId = (cat as any)._id || cat.id;
+                      return (
+                        <option key={catId} value={catId}>
+                          {cat.name}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>

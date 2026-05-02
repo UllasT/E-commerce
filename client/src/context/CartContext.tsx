@@ -31,28 +31,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const res = await api.get('cart');
       const cartItems = res.data || [];
       // Transform backend response to CartItem format
-      const transformed = cartItems.map((item: any) => ({
-        id: item.id,
-        user_id: item.user_id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        created_at: item.created_at,
-        product: {
-          id: item.product_id,  // Fix: use product_id, not item.id
-          name: item.name,
-          description: item.description,
-          price: item.price,
-          compare_price: item.compare_price || null,
-          slug: item.slug,
-          image_url: item.image_url,
-          category_id: item.category_id,
-          rating: item.rating || 0,
-          review_count: item.review_count || 0,
-          stock: item.stock,
-          featured: item.featured || false,
+      const transformed = cartItems.map((item: any) => {
+        const productData = item.product_id || {};
+        return {
+          id: item._id || item.id,
+          user_id: item.user_id,
+          product_id: productData._id || productData.id,
+          quantity: item.quantity,
           created_at: item.created_at,
-        } as Product
-      })) as CartItem[];
+          product: {
+            id: productData._id || productData.id,
+            name: productData.name,
+            description: productData.description,
+            price: productData.price,
+            compare_price: productData.compare_price || null,
+            slug: productData.slug,
+            image_url: productData.image_url,
+            category_id: productData.category_id,
+            rating: productData.rating || 0,
+            review_count: productData.review_count || 0,
+            stock: productData.stock,
+            featured: productData.featured || false,
+            created_at: productData.created_at,
+          } as Product
+        };
+      }) as CartItem[];
       setItems(transformed);
     } catch (err: any) {
       if (err.response?.status === 401) {

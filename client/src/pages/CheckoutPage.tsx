@@ -2,17 +2,20 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { CreditCard, Truck, Banknote, CircleCheck as CheckCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import type { Address } from '../types';
-import { createId, getAddressStore, getOrderStore, saveAddressStore, saveOrderStore } from '../lib/localStore';
+import api from '../lib/api';
 
 export default function CheckoutPage() {
   const { items, cartTotal, clearCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [loading, setLoading] = useState(false);
+  const [fetchingAddresses, setFetchingAddresses] = useState(true);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
 
@@ -24,81 +27,80 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    const stored = getAddressStore().guest ?? [];
-    setAddresses(stored as Address[]);
-    if (stored.length > 0) {
-      const defaultAddr = stored.find(a => a.is_default);
-      setSelectedAddress((defaultAddr ?? stored[0]).id);
+    const fetchAddresses = async () => {
+      try {
+        const res = await api.get('addresses/list');
+        const addrs = res.data || [];
+        setAddresses(addrs);
+        if (addrs.length > 0) {
+          const defaultAddr = addrs.find((a: Address) => a.is_default);
+          const selectedId = (defaultAddr ?? addrs[0])._id || (defaultAddr ?? addrs[0]).id;
+          setSelectedAddress(selectedId);
+        }
+      } catch (err) {
+        console.error('Error fetching addresses:', err);
+      } finally {
+        setFetchingAddresses(false);
+      }
+    };
+    if (user) {
+      fetchAddresses();
     }
-  }, []);
+  }, [user]);
 
   if (items.length === 0 && !orderPlaced) {
     navigate('/cart');
     return null;
   }
 
+  if (fetchingAddresses) {
+    return <div className="spinner" />;
+  }
+
   const shipping = cartTotal >= 500 ? 0 : 49;
   const total = cartTotal + shipping;
 
   const handleAddAddress = async () => {
-    const address: Address = {
-      id: createId('addr'),
-      user_id: 'guest',
-      ...newAddress,
-      is_default: addresses.length === 0,
-      created_at: new Date().toISOString(),
-    };
-    const stored = getAddressStore();
-    stored.guest = [...(stored.guest ?? []), address];
-    saveAddressStore(stored);
-    setAddresses(prev => [...prev, address]);
-    setSelectedAddress(address.id);
-    setShowNewAddress(false);
-    setNewAddress({ full_name: '', phone: '', address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'India' });
+    try {
+      const payload = {
+        ...newAddress,
+        is_default: addresses.length === 0,
+      };
+      const res = await api.post('addresses/add', payload);
+      const addedAddress = res.data;
+      setAddresses(prev => [...prev, addedAddress]);
+      const newSelectedId = addedAddress._id || addedAddress.id;
+      setSelectedAddress(newSelectedId);
+      setShowNewAddress(false);
+      setNewAddress({ full_name: '', phone: '', address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'India' });
+    } catch (err: any) {
+      console.error('Error adding address:', err);
+    }
   };
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress) return;
     setLoading(true);
 
-    const addr = addresses.find(a => a.id === selectedAddress);
-    const num = `SK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-    const orderId = createId('order');
-    const orderItems = items.map(item => ({
-      id: createId('order_item'),
-      order_id: orderId,
-      product_id: item.product_id,
-      product_name: item.product?.name ?? '',
-      product_image: item.product?.image_url ?? '',
-      price: item.product?.price ?? 0,
-      quantity: item.quantity,
-      created_at: new Date().toISOString(),
-    }));
-
-    const orders = getOrderStore();
-    orders.guest = [
-      ...(orders.guest ?? []),
-      {
-        id: orderId,
-        user_id: 'guest',
-        order_number: num,
-        status: 'pending',
-        total_amount: total,
-        shipping_address: addr as unknown as Record<string, unknown>,
+    try {
+      const addr = addresses.find((a:any) => (a.id === selectedAddress) || (a._id === selectedAddress));
+      
+      const payload = {
+        items,
+        shipping_address: addr,
         payment_method: paymentMethod,
-        payment_status: paymentMethod === 'cod' ? 'pending' : 'paid',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        order_items: orderItems,
-      },
-    ];
-    saveOrderStore(orders);
-    await clearCart();
-    setOrderNumber(num);
-    setOrderPlaced(true);
+      };
 
-    setLoading(false);
+      const res = await api.post('orders/create', payload);
+      const order = res.data;
+      
+      setOrderNumber(order.order_number || `SK${Date.now().toString(36).toUpperCase()}`);
+      setOrderPlaced(true);
+    } catch (err: any) {
+      console.error('Error placing order:', err.response?.data || err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (orderPlaced) {
@@ -133,17 +135,20 @@ export default function CheckoutPage() {
             {/* Shipping Address */}
             <div className="checkout-section">
               <h2>Shipping Address</h2>
-              {addresses.map(addr => (
-                <div
-                  key={addr.id}
-                  className={`address-card ${selectedAddress === addr.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedAddress(addr.id)}
-                >
-                  <div className="name">{addr.full_name} {addr.is_default && <span style={{ fontSize: '0.75rem', color: 'var(--primary-600)', fontWeight: 600 }}>(Default)</span>}</div>
-                  <div className="detail">{addr.phone}</div>
-                  <div className="detail">{addr.address_line1}, {addr.city}, {addr.state} - {addr.postal_code}</div>
-                </div>
-              ))}
+              {addresses.map(addr => {
+                const addrId = (addr as any)._id || addr.id;
+                return (
+                  <div
+                    key={addrId}
+                    className={`address-card ${selectedAddress === addrId ? 'selected' : ''}`}
+                    onClick={() => setSelectedAddress(addrId)}
+                  >
+                    <div className="name">{addr.full_name} {addr.is_default && <span style={{ fontSize: '0.75rem', color: 'var(--primary-600)', fontWeight: 600 }}>(Default)</span>}</div>
+                    <div className="detail">{addr.phone}</div>
+                    <div className="detail">{addr.address_line1}, {addr.city}, {addr.state} - {addr.postal_code}</div>
+                  </div>
+                );
+              })}
 
               {showNewAddress ? (
                 <div style={{ marginTop: 16, padding: 16, border: '1.5px solid var(--neutral-200)', borderRadius: 'var(--radius-md)' }}>
