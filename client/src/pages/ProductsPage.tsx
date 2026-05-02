@@ -18,7 +18,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const selectedCategory = searchParams.get('category') || '';
+  const selectedCategory = searchParams.get('category_id') || '';
   const searchQuery = searchParams.get('search') || '';
   const selectedPriceRanges = searchParams.get('price')?.split(',').filter(Boolean) || [];
 
@@ -51,11 +51,7 @@ export default function ProductsPage() {
       try {
         const params: any = {};
         if (searchQuery) params.q = searchQuery;
-        if (selectedCategory) {
-          // Send category slug; backend will resolve it to ID
-          params.category_id = selectedCategory;
-        }
-        console.log('Fetching products with params:', params);
+        if (selectedCategory) params.category_id = selectedCategory;
         const res = await api.get('products', { params });
         const items = res.data?.items ?? res.data ?? [];
         console.log('Products response:', { received: items.length, data: res.data });
@@ -79,10 +75,10 @@ export default function ProductsPage() {
     });
   }, [products, selectedPriceRanges]);
 
-  const toggleCategory = (slug: string) => {
+  const toggleCategory = (categoryId: string) => {
     setSearchParams(prev => {
-      if (slug === selectedCategory) prev.delete('category');
-      else prev.set('category', slug);
+      if (categoryId === selectedCategory) prev.delete('category_id');
+      else prev.set('category_id', categoryId);
       return prev;
     });
   };
@@ -100,7 +96,7 @@ export default function ProductsPage() {
 
   const clearFilters = () => setSearchParams({});
 
-  const activeCategory = categories.find(c => c.slug === selectedCategory);
+  const activeCategory = categories.find(c => ((c as any)._id || c.id) === selectedCategory);
 
   return (
     <div className="page">
@@ -123,16 +119,19 @@ export default function ProductsPage() {
 
             <div className="filter-group">
               <h3>Category</h3>
-              {categories.map(cat => (
-                <label key={cat.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedCategory === cat.slug}
-                    onChange={() => toggleCategory(cat.slug)}
-                  />
-                  {cat.name}
-                </label>
-              ))}
+              {categories.map(cat => {
+                const categoryId = (cat as any)._id || cat.id;
+                return (
+                  <label key={categoryId}>
+                    <input
+                      type="checkbox"
+                      checked={selectedCategory === categoryId}
+                      onChange={() => toggleCategory(categoryId)}
+                    />
+                    {cat.name}
+                  </label>
+                );
+              })}
             </div>
 
             <div className="filter-group">

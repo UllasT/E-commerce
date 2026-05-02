@@ -1,5 +1,6 @@
 
 import { DATABASE_TYPE } from "../config/db.js";
+import mongoose from 'mongoose';
 import pool from "../db/sql/index.js";
 import productSchema from "../models/product.schema.js";
 import categorySchema from "../models/category.schema.js";
@@ -279,12 +280,17 @@ const SearchProducts = async (req: any, res: any) => {
             }
 
             let resolvedCategoryId = category_id;
-            if (category_id && isNaN(Number(category_id))) {
-                const cat: any = await categorySchema.findOne({ slug: category_id }).lean();
-                if (cat) {
-                    resolvedCategoryId = String(cat._id || cat.id);
+            if (category_id) {
+                const categoryValue = String(category_id).trim();
+                if (mongoose.Types.ObjectId.isValid(categoryValue)) {
+                    resolvedCategoryId = categoryValue;
                 } else {
-                    resolvedCategoryId = null;
+                    const cat: any = await categorySchema.findOne({ slug: categoryValue }).lean();
+                    if (cat) {
+                        resolvedCategoryId = String(cat._id || cat.id);
+                    } else {
+                        resolvedCategoryId = null;
+                    }
                 }
             }
 
