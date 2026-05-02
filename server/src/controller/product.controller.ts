@@ -228,19 +228,20 @@ const SearchProducts = async (req: any, res: any) => {
                 params.push(like, like, like);
             }
 
-            let resolvedCategoryId = category_id;
-            if (category_id && isNaN(Number(category_id))) {
-                const [catRows]: any = await pool.execute('SELECT id FROM categories WHERE slug = ?', [category_id]);
-                if (catRows && catRows.length > 0) {
-                    resolvedCategoryId = catRows[0].id;
-                } else {
-                    resolvedCategoryId = null;
-                }
-            }
+            if (category_id) {
+                const categoryValue = String(category_id).trim();
+                const [catRows]: any = await pool.execute(
+                    'SELECT id FROM categories WHERE id = ? OR slug = ? LIMIT 1',
+                    [categoryValue, categoryValue]
+                );
 
-            if (resolvedCategoryId) {
-                where.push('category_id = ?');
-                params.push(resolvedCategoryId);
+                if (catRows && catRows.length > 0) {
+                    where.push('category_id = ?');
+                    params.push(catRows[0].id);
+                } else {
+                    // Explicit category filter provided but not found: return no products.
+                    where.push('1 = 0');
+                }
             }
 
             if (min_price) {
@@ -263,9 +264,8 @@ const SearchProducts = async (req: any, res: any) => {
             if (sort === 'price_asc') orderBy = 'ORDER BY price ASC';
             else if (sort === 'price_desc') orderBy = 'ORDER BY price DESC';
 
-            const dataQuery = `SELECT * FROM products ${whereClause} ${orderBy} LIMIT ? OFFSET ?`;
-            const dataParams = params.concat([limitNum, offset]);
-            const [rows]: any = await pool.execute(dataQuery, dataParams);
+            const dataQuery = `SELECT * FROM products ${whereClause} ${orderBy} LIMIT ${limitNum} OFFSET ${offset}`;
+            const [rows]: any = await pool.execute(dataQuery, params);
 
             const countQuery = `SELECT COUNT(*) as total FROM products ${whereClause}`;
             const [countRows]: any = await pool.execute(countQuery, params);

@@ -10,6 +10,7 @@ interface CartContextType {
   removeFromCart: (itemId: string) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  refreshCart: () => Promise<void>;
   cartTotal: number;
   cartCount: number;
 }
@@ -29,18 +30,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const res = await api.get('cart');
-      const cartItems = res.data || [];
+      const cartItems = Array.isArray(res.data?.items)
+        ? res.data.items
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
       // Transform backend response to CartItem format
       const transformed = cartItems.map((item: any) => {
-        const productData = item.product_id || {};
+        const hasNestedProduct = typeof item.product_id === 'object' && item.product_id !== null;
+        const productData = hasNestedProduct ? item.product_id : item;
+        const cartItemId = item._id || item.cart_item_id || item.id;
+        const cartProductId = hasNestedProduct
+          ? (productData._id || productData.id)
+          : (item.cart_product_id || item.product_id);
         return {
-          id: item._id || item.id,
-          user_id: item.user_id,
-          product_id: productData._id || productData.id,
-          quantity: item.quantity,
-          created_at: item.created_at,
+          id: cartItemId,
+          user_id: item.user_id || item.cart_user_id,
+          product_id: cartProductId,
+          quantity: item.quantity ?? item.cart_quantity,
+          created_at: item.created_at || item.cart_created_at,
           product: {
-            id: productData._id || productData.id,
+            id: cartProductId,
             name: productData.name,
             description: productData.description,
             price: productData.price,
@@ -52,7 +62,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             review_count: productData.review_count || 0,
             stock: productData.stock,
             featured: productData.featured || false,
-            created_at: productData.created_at,
+            created_at: productData.created_at || item.product_created_at,
           } as Product
         };
       }) as CartItem[];
@@ -141,7 +151,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ items, loading, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount }}>
+    <CartContext.Provider value={{ items, loading, addToCart, removeFromCart, updateQuantity, clearCart, refreshCart: fetchCart, cartTotal, cartCount }}>
       {children}
     </CartContext.Provider>
   );

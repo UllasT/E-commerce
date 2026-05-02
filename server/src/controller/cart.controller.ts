@@ -60,7 +60,25 @@ const GetCart = async (req: any, res: any) => {
     if (DATABASE_TYPE === 'sql') {
         try {
             const [rows]: any = await pool.execute(
-                `SELECT c.id, c.user_id, c.product_id, c.quantity, c.created_at, p.* 
+                `SELECT
+                    c.id AS cart_item_id,
+                    c.user_id AS cart_user_id,
+                    c.product_id AS cart_product_id,
+                    c.quantity AS cart_quantity,
+                    c.created_at AS cart_created_at,
+                    p.id AS product_id,
+                    p.name,
+                    p.slug,
+                    p.description,
+                    p.price,
+                    p.compare_price,
+                    p.image_url,
+                    p.category_id,
+                    p.rating,
+                    p.review_count,
+                    p.stock,
+                    p.featured,
+                    p.created_at AS product_created_at
                  FROM cart_items c 
                  JOIN products p ON c.product_id = p.id 
                  WHERE c.user_id = ?`,

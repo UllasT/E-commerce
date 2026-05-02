@@ -7,7 +7,7 @@ import type { Address } from '../types';
 import api from '../lib/api';
 
 export default function CheckoutPage() {
-  const { items, cartTotal, clearCart } = useCart();
+  const { items, cartTotal, refreshCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -95,6 +95,7 @@ export default function CheckoutPage() {
       const order = res.data;
       
       setOrderNumber(order.order_number || `SK${Date.now().toString(36).toUpperCase()}`);
+      await refreshCart();
       setOrderPlaced(true);
     } catch (err: any) {
       console.error('Error placing order:', err.response?.data || err.message);

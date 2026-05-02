@@ -28,7 +28,6 @@ export default function ProductsPage() {
       try {
         const res = await api.get('categories');
         const cats = res.data?.categories || res.data?.catagories || [];
-        console.log('Categories from backend:', cats);
         if (cats.length > 0) {
           setCategories(cats);
         } else {
@@ -54,7 +53,6 @@ export default function ProductsPage() {
         if (selectedCategory) params.category_id = selectedCategory;
         const res = await api.get('products', { params });
         const items = res.data?.items ?? res.data ?? [];
-        console.log('Products response:', { received: items.length, data: res.data });
         setProducts(items);
       } catch (err: any) {
         console.error('Error fetching products:', err?.response?.data || err.message);

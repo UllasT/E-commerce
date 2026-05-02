@@ -32,7 +32,8 @@ export default function Admin() {
       try {
         // Fetch categories
         const catRes = await api.get('categories');
-        const fetchedCategories = catRes.data.catagories || catRes.data 
+        
+        const fetchedCategories = catRes.data.categories || catRes.data.catagories || [];  
  ;
         setCategories(fetchedCategories);
 
