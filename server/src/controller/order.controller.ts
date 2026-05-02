@@ -68,6 +68,7 @@ const CreateOrder = async (req: any, res: any) => {
       let total = 0;
       const validatedItems: any[] = [];
       for (const it of items) {
+       
         const prod = await productSchema.findById(it.product_id).lean();
         if (!prod) return res.status(404).json({ message: `Product ${it.product_id} not found` });
         const qty = Number(it.quantity) || 1;
