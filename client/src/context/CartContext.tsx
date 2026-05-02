@@ -77,7 +77,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     try {
       const res = await api.post('cart/add', { productId, quantity: 1 });
-      console.log('Add to cart response:', res.data);
+  
       await fetchCart();
     } catch (err: any) {
       if (err.response?.status === 401) {

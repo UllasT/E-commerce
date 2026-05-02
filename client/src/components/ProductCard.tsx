@@ -20,7 +20,7 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({ product }: { product: any }) {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
@@ -29,7 +29,9 @@ export default function ProductCard({ product }: { product: Product }) {
     e.preventDefault();
     e.stopPropagation();
     try {
-      await addToCart(product.id);
+
+      
+      await addToCart(product.id || product._id);
     } catch (err: any) {
       if (err.message === 'PLEASE_LOGIN') {
         navigate('/login');
@@ -41,7 +43,7 @@ export default function ProductCard({ product }: { product: Product }) {
     e.preventDefault();
     e.stopPropagation();
     try {
-      await toggleWishlist(product.id);
+      await toggleWishlist(product.id ||  product._id);
     } catch (err: any) {
       if (err.message === 'PLEASE_LOGIN') {
         navigate('/login');
