@@ -13,6 +13,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
+import Dashboard from './pages/Dashboard';
 
 function AppRoutes() {
   return (
@@ -29,6 +30,7 @@ function AppRoutes() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
