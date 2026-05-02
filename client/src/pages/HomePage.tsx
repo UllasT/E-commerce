@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import type { Product, Category } from '../types';
 import ProductCard from '../components/ProductCard';
-import { getCategories, getFeaturedProducts } from '../lib/localStore';
+import api from '../lib/api';
 
 export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -11,9 +11,25 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setCategories(getCategories());
-    setFeatured(getFeaturedProducts() as (Product & { category: Category })[]);
-    setLoading(false);
+    (async () => {
+      try {
+        // Fetch categories
+        const catRes = await api.get('categories');
+        const cats = catRes.data?.categories || catRes.data?.catagories || [];
+        setCategories(cats);
+
+        // Fetch featured products
+        const featRes = await api.get('products', { params: { featured: 'true' } });
+        const featuredProducts = featRes.data?.items || featRes.data || [];
+        setFeatured(featuredProducts);
+      } catch (err) {
+        console.error('Error fetching homepage data:', err);
+        setCategories([]);
+        setFeatured([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   if (loading) return <div className="spinner" />;
@@ -49,7 +65,9 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="products-grid">
-          {featured.map(p => <ProductCard key={p.id} product={p} />)}
+          {featured.map(p => (
+            <ProductCard key={p.slug || p.id || Math.random()} product={p} />
+          ))}
         </div>
       </div>
     </div>

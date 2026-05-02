@@ -82,7 +82,61 @@ const GetCart = async (req: any, res: any) => {
     }
 }
 
-export { AddToCart, GetCart } 
+const RemoveFromCart = async (req: any, res: any) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) return res.status(401).json({ message: "Unauthorized", user: req.user ,error: "User ID not found in request" });
+    if (!id) return res.status(400).json({ message: "Cart item ID is required" });
+    if (DATABASE_TYPE === 'sql') {
+        try {
+            const [result]: any = await pool.execute('DELETE FROM cart_items WHERE id = ? AND user_id = ?', [id, userId]);
+            if (result.affectedRows === 0) return res.status(404).json({ message: "Cart item not found" });
+            res.status(200).json({ message: "Product removed from cart" });
+        } catch (error) {
+            console.error('Error removing from cart:', error);
+            res.status(500).json({ message: "Internal server error" });
+        }
+    } else if (DATABASE_TYPE === 'mongodb') {
+        try {
+            const result = await cartitemSchema.findOneAndDelete({ _id: id, user_id: userId });
+            if (!result) return res.status(404).json({ message: "Cart item not found" });
+            res.status(200).json({ message: "Product removed from cart" });
+        } catch (error) {
+            console.error('Error removing from cart in MongoDB:', error);
+            res.status(500).json({ message: "Internal server error" });
+        }
+    }
+}
+
+const UpdateCartItem = async (req: any, res: any) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const { quantity } = req.body;
+    if (!userId) return res.status(401).json({ message: "Unauthorized", user: req.user ,error: "User ID not found in request" });
+    if (!id) return res.status(400).json({ message: "Cart item ID is required" });
+    if (!quantity || quantity < 1) return res.status(400).json({ message: "Quantity must be a positive number" });
+    if (DATABASE_TYPE === 'sql') {
+        try {
+            const [result]: any = await pool.execute('UPDATE cart_items SET quantity = ? WHERE id = ? AND user_id = ?', [quantity, id, userId]);
+            if (result.affectedRows === 0) return res.status(404).json({ message: "Cart item not found" });
+            res.status(200).json({ message: "Cart item updated" });
+        } catch (error) {
+            console.error('Error updating cart item:', error);
+            res.status(500).json({ message: "Internal server error" });
+        }
+    } else if (DATABASE_TYPE === 'mongodb') {
+        try {
+            const result = await cartitemSchema.findOneAndUpdate({ _id: id, user_id: userId }, { quantity }, { new: true });
+            if (!result) return res.status(404).json({ message: "Cart item not found" });
+            res.status(200).json({ message: "Cart item updated", item: result });
+        } catch (error) {
+            console.error('Error updating cart item in MongoDB:', error);
+            res.status(500).json({ message: "Internal server error" });
+        }
+    }
+}
+
+export { AddToCart, GetCart, RemoveFromCart, UpdateCartItem } 
 
 
 

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Product, Category } from '../types';
 import ProductCard from '../components/ProductCard';
-import { getCategories, getCategoryBySlug, getProducts } from '../lib/localStore';
+import api from '../lib/api';
 
 const PRICE_RANGES = [
   { label: 'Under 500', min: 0, max: 500 },
@@ -22,26 +22,51 @@ export default function ProductsPage() {
   const searchQuery = searchParams.get('search') || '';
   const selectedPriceRanges = searchParams.get('price')?.split(',').filter(Boolean) || [];
 
+  // Fetch categories from backend with fallback
   useEffect(() => {
-    setCategories(getCategories());
+    (async () => {
+      try {
+        const res = await api.get('categories');
+        const cats = res.data?.categories || res.data?.catagories || [];
+        console.log('Categories from backend:', cats);
+        if (cats.length > 0) {
+          setCategories(cats);
+        } else {
+          // Fallback to local categories if backend returns empty
+          const { getCategories } = await import('../lib/localStore');
+          setCategories(getCategories());
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        // Fallback to local categories on error
+        const { getCategories } = await import('../lib/localStore');
+        setCategories(getCategories());
+      }
+    })();
   }, []);
 
   useEffect(() => {
     setLoading(true);
-    let result = getProducts();
-
-    if (selectedCategory) {
-      const category = getCategoryBySlug(selectedCategory);
-      result = category ? result.filter(product => product.category_id === category.id) : [];
-    }
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(product => product.name.toLowerCase().includes(query) || product.description.toLowerCase().includes(query));
-    }
-
-    setProducts(result as (Product & { category: Category })[]);
-    setLoading(false);
+    (async () => {
+      try {
+        const params: any = {};
+        if (searchQuery) params.q = searchQuery;
+        if (selectedCategory) {
+          // Send category slug; backend will resolve it to ID
+          params.category_id = selectedCategory;
+        }
+        console.log('Fetching products with params:', params);
+        const res = await api.get('products', { params });
+        const items = res.data?.items ?? res.data ?? [];
+        console.log('Products response:', { received: items.length, data: res.data });
+        setProducts(items);
+      } catch (err: any) {
+        console.error('Error fetching products:', err?.response?.data || err.message);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [selectedCategory, searchQuery]);
 
   const filteredProducts = useMemo(() => {
@@ -140,7 +165,9 @@ export default function ProductsPage() {
               </div>
             ) : (
               <div className="products-grid">
-                {filteredProducts.map(p => <ProductCard key={p.id} product={p} />)}
+                {filteredProducts.map(p => (
+                  <ProductCard key={p.slug || p.id || Math.random()} product={p} />
+                ))}
               </div>
             )}
           </div>

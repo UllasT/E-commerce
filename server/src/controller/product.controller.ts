@@ -2,6 +2,7 @@
 import { DATABASE_TYPE } from "../config/db.js";
 import pool from "../db/sql/index.js";
 import productSchema from "../models/product.schema.js";
+import categorySchema from "../models/category.schema.js";
 
 
 
@@ -173,9 +174,140 @@ const GetProductsById = async (req: any, res: any) => {
         }
     }
 }
- 
 
+const GetProductBySlug = async (req: any, res: any) => {
+    const { slug } = req.params;
+    if (!slug) return res.status(400).json({ message: "Product slug is required" });
+    if (DATABASE_TYPE === 'sql') {
+        try {
+            const [rows]: any = await pool.execute('SELECT * FROM products WHERE slug = ? LIMIT 1', [slug]);
+            if (!rows || rows.length === 0) return res.status(404).json({ message: "Product not found" });
+            return res.status(200).json(rows[0]);
+        } catch (error) {
+            console.error('Error fetching product by slug (SQL):', error);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+    } else if (DATABASE_TYPE === 'mongodb') {
+        try {
+            const product = await productSchema.findOne({ slug }).lean();
+            if (!product) return res.status(404).json({ message: "Product not found" });
+            return res.status(200).json(product);
+        } catch (error) {
+            console.error('Error fetching product by slug (MongoDB):', error);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+}
+const SearchProducts = async (req: any, res: any) => {
+    try {
+        const {
+            q,
+            category_id,
+            min_price,
+            max_price,
+            in_stock,
+            page = '1',
+            limit = '20',
+            sort = 'newest',
+        } = req.query;
 
+        const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
+        const limitNum = Math.max(1, parseInt(String(limit), 10) || 20);
+        const offset = (pageNum - 1) * limitNum;
 
+        if (DATABASE_TYPE === 'sql') {
+            const where: string[] = [];
+            const params: any[] = [];
 
-export  {CreateProduct, GetProductsById, GetUserProducts,DeleteProduct, UpdateProduct}
+            if (q) {
+                where.push('(name LIKE ? OR description LIKE ? OR slug LIKE ?)');
+                const like = `%${String(q).trim().replace(/%/g, '\\%')}%`;
+                params.push(like, like, like);
+            }
+
+            let resolvedCategoryId = category_id;
+            if (category_id && isNaN(Number(category_id))) {
+                const [catRows]: any = await pool.execute('SELECT id FROM categories WHERE slug = ?', [category_id]);
+                if (catRows && catRows.length > 0) {
+                    resolvedCategoryId = catRows[0].id;
+                } else {
+                    resolvedCategoryId = null;
+                }
+            }
+
+            if (resolvedCategoryId) {
+                where.push('category_id = ?');
+                params.push(resolvedCategoryId);
+            }
+
+            if (min_price) {
+                where.push('price >= ?');
+                params.push(Number(min_price));
+            }
+
+            if (max_price) {
+                where.push('price <= ?');
+                params.push(Number(max_price));
+            }
+
+            if (in_stock === 'true' || in_stock === '1') {
+                where.push('stock > 0');
+            }
+
+            const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+            let orderBy = 'ORDER BY id DESC';
+            if (sort === 'price_asc') orderBy = 'ORDER BY price ASC';
+            else if (sort === 'price_desc') orderBy = 'ORDER BY price DESC';
+
+            const dataQuery = `SELECT * FROM products ${whereClause} ${orderBy} LIMIT ? OFFSET ?`;
+            const dataParams = params.concat([limitNum, offset]);
+            const [rows]: any = await pool.execute(dataQuery, dataParams);
+
+            const countQuery = `SELECT COUNT(*) as total FROM products ${whereClause}`;
+            const [countRows]: any = await pool.execute(countQuery, params);
+            const total = countRows[0]?.total ?? 0;
+
+            return res.status(200).json({ items: rows, total, page: pageNum, limit: limitNum });
+        } else if (DATABASE_TYPE === 'mongodb') {
+            const filter: any = {};
+            if (q) {
+                const regex = new RegExp(String(q).trim(), 'i');
+                filter.$or = [{ name: regex }, { description: regex }, { slug: regex }];
+            }
+
+            let resolvedCategoryId = category_id;
+            if (category_id && isNaN(Number(category_id))) {
+                const cat: any = await categorySchema.findOne({ slug: category_id }).lean();
+                if (cat) {
+                    resolvedCategoryId = String(cat._id || cat.id);
+                } else {
+                    resolvedCategoryId = null;
+                }
+            }
+
+            if (resolvedCategoryId) filter.category_id = resolvedCategoryId;
+            if (min_price || max_price) {
+                filter.price = {};
+                if (min_price) filter.price.$gte = Number(min_price);
+                if (max_price) filter.price.$lte = Number(max_price);
+            }
+            if (in_stock === 'true' || in_stock === '1') filter.stock = { $gt: 0 };
+
+            let sortObj: any = { _id: -1 };
+            if (sort === 'price_asc') sortObj = { price: 1 };
+            else if (sort === 'price_desc') sortObj = { price: -1 };
+
+            const items = await productSchema.find(filter).sort(sortObj).skip(offset).limit(limitNum).lean();
+            const total = await productSchema.countDocuments(filter);
+            return res.status(200).json({ items, total, page: pageNum, limit: limitNum });
+        }
+
+        return res.status(500).json({ message: 'Unknown DATABASE_TYPE' });
+    } catch (error) {
+        console.error('SearchProducts error:', error);
+        return res.status(500).json({ message: 'Internal server error', error });
+    }
+}
+
+export { GetProductBySlug,CreateProduct, GetProductsById, GetUserProducts, DeleteProduct, UpdateProduct, SearchProducts };

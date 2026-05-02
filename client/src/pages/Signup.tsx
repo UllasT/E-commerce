@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 type SignupForm = {
 	full_name: string;
 	phone: string;
 	email: string;
+	password: string;
 };
 
 type FormErrors = {
 	full_name?: string;
 	phone?: string;
 	email?: string;
+	password?: string;
 	submit?: string;
 };
 
@@ -19,6 +22,7 @@ const initialForm: SignupForm = {
 	full_name: '',
 	phone: '',
 	email: '',
+	password: '',
 };
 
 export default function Signup() {
@@ -26,13 +30,14 @@ export default function Signup() {
 	const [errors, setErrors] = useState<FormErrors>({});
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isSuccess, setIsSuccess] = useState(false);
+	const { signUp } = useAuth();
+	const navigate = useNavigate();
 
 	const validate = () => {
 		const nextErrors: FormErrors = {};
 
-		if (form.full_name.trim().length > 255) {
-			nextErrors.full_name = 'Full name must be 255 characters or less';
-		}
+		if (!form.full_name.trim()) nextErrors.full_name = 'Full name is required';
+		else if (form.full_name.trim().length > 255) nextErrors.full_name = 'Full name must be 255 characters or less';
 
 		if (!form.phone.trim()) {
 			nextErrors.phone = 'Phone is required';
@@ -48,39 +53,35 @@ export default function Signup() {
 			nextErrors.email = 'Enter a valid email address';
 		}
 
+		if (!form.password) nextErrors.password = 'Password is required';
+		else if (form.password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
+
 		setErrors(nextErrors);
 		return Object.keys(nextErrors).length === 0;
 	};
 
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+		console.log('====================================');
+		console.log(form);
+		console.log('====================================');
 		setIsSuccess(false);
 
-		if (!validate()) {
-			return;
-		}
+		if (!validate()) return;
 
 		try {
 			setIsSubmitting(true);
 			setErrors({});
 
-			const response = await fetch('/api/sql/users/create', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					full_name: form.full_name.trim(),
-					phone: form.phone.trim(),
-					email: form.email.trim(),
-					phoneemail: form.email.trim(),
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error('Unable to create account right now');
+			const result = await signUp(form.full_name.trim(), form.phone.trim(), form.email.trim(), form.password);
+			if (result.error) {
+				setErrors({ submit: result.error });
+				return;
 			}
 
 			setIsSuccess(true);
 			setForm(initialForm);
+			navigate('/login');
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Signup failed. Please try again.';
 			setErrors({ submit: message });
@@ -93,7 +94,7 @@ export default function Signup() {
 		<div className="auth-page">
 			<div className="auth-card">
 				<h1>Create Account</h1>
-				<p className="subtitle">Use your full name, phone number, and email to register.</p>
+				<p className="subtitle">Use your full name, phone number, email and a password to register.</p>
 
 				<form onSubmit={handleSubmit} noValidate>
 					<div className="form-group">
@@ -138,6 +139,20 @@ export default function Signup() {
 							onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
 						/>
 						{errors.email ? <p className="form-error">{errors.email}</p> : null}
+					</div>
+
+					<div className="form-group">
+						<label htmlFor="password">Password</label>
+						<input
+							id="password"
+							name="password"
+							type="password"
+							required
+							placeholder="Enter a password"
+							value={form.password}
+							onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+						/>
+						{errors.password ? <p className="form-error">{errors.password}</p> : null}
 					</div>
 
 					{errors.submit ? <p className="form-error">{errors.submit}</p> : null}

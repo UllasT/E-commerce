@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Plus, X, Trash2, Edit2, Loader } from 'lucide-react';
 import type { Product, Category } from '../types';
+import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 // Sample Data
 const SAMPLE_CATEGORIES: Category[] = [
@@ -72,9 +74,10 @@ const SAMPLE_PRODUCTS: Product[] = [
 ];
 
 export default function Admin() {
-  const [products, setProducts] = useState<Product[]>(SAMPLE_PRODUCTS);
+  const { user } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>(SAMPLE_CATEGORIES);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -93,8 +96,19 @@ export default function Admin() {
   });
 
   useEffect(() => {
-    // Sample data loaded, no need to fetch
-  }, []);
+    if (!user) return;
+    (async () => {
+      try {
+        const res = await api.get('products/user');
+        setProducts(res.data ?? []);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user]);
 
   const handleOpenModal = (product: Product | null = null) => {
     if (product) {
@@ -157,27 +171,29 @@ export default function Admin() {
 
     try {
       const payload = {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
         price: parseFloat(formData.price),
-        compare_price: formData.compare_price ? parseFloat(formData.compare_price) : null,
+        category_id: formData.category_id,
         stock: parseInt(formData.stock),
       };
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
       if (editingProduct) {
-        // Update product in state
-        setProducts(products.map(p => p.id === editingProduct.id ? { ...payload, id: p.id, created_at: p.created_at, rating: p.rating, review_count: p.review_count } as Product : p));
+        await api.put(`products/update/${editingProduct.id}`, payload);
+        setProducts(products.map(p => p.id === editingProduct.id ? { ...p, ...payload } : p));
         setMessage({ type: 'success', text: 'Product updated successfully!' });
       } else {
-        // Create new product
-        const newProduct: Product = {
+        const res = await api.post('products/create', payload);
+        const newProduct: Product =         {
+          id: res.data?.productId ?? Date.now().toString(),
           ...payload,
-          id: Date.now().toString(),
-          created_at: new Date().toISOString(),
+          compare_price: null,  // Changed from undefined to null
+          slug: formData.slug,
+          image_url: formData.image_url,
           rating: 0,
           review_count: 0,
+          featured: formData.featured,
+          created_at: new Date().toISOString(),
         } as Product;
         setProducts([newProduct, ...products]);
         setMessage({ type: 'success', text: 'Product added successfully!' });
@@ -185,9 +201,10 @@ export default function Admin() {
       
       handleCloseModal();
       setTimeout(() => setMessage(null), 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting form:', error);
-      setMessage({ type: 'error', text: 'Error saving product. Please try again.' });
+      const msg = error?.response?.data?.message || 'Error saving product. Please try again.';
+      setMessage({ type: 'error', text: msg });
       setTimeout(() => setMessage(null), 2000);
     } finally {
       setSubmitting(false);
@@ -198,15 +215,28 @@ export default function Admin() {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
 
     try {
+      await api.delete(`products/delete/${productId}`);
       setProducts(products.filter(p => p.id !== productId));
       setMessage({ type: 'success', text: 'Product deleted successfully!' });
       setTimeout(() => setMessage(null), 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting product:', error);
-      setMessage({ type: 'error', text: 'Error deleting product.' });
+      const msg = error?.response?.data?.message || 'Error deleting product.';
+      setMessage({ type: 'error', text: msg });
       setTimeout(() => setMessage(null), 2000);
     }
   };
+
+  if (!user) {
+    return (
+      <div className="admin-page container">
+        <div className="empty-state">
+          <h2>Please log in to access admin panel</h2>
+          <p>You need to be logged in to manage products.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="admin-page loading"><div className="spinner" /></div>;

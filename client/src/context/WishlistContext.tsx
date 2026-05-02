@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { WishlistItem, Product } from '../types';
-import { createId, getProductById, getWishlistStore, saveWishlistStore } from '../lib/localStore';
+import api from '../lib/api';
+import { useAuth } from './AuthContext';
 
 interface WishlistContextType {
   items: WishlistItem[];
@@ -14,38 +15,76 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 export function WishlistProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const guestId = 'guest';
+  const { user, signOut } = useAuth();
 
   const fetchWishlist = async () => {
+    if (!user) {
+      setItems([]);
+      return;
+    }
     setLoading(true);
-    const wishlist = getWishlistStore()[guestId] ?? [];
-    setItems(
-      wishlist
-        .map((item: { id: string; user_id: string; product_id: string; created_at: string }) => {
-          const product = getProductById(item.product_id);
-          return product ? { ...item, product } : null;
-        })
-        .filter(Boolean) as (WishlistItem & { product: Product })[]
-    );
-    setLoading(false);
+    try {
+      const res = await api.get('wishlist');
+      const wishlistItems = res.data || [];
+      // Transform backend response to WishlistItem format
+      const transformed = wishlistItems.map((item: any) => ({
+        id: item.id,
+        user_id: item.user_id,
+        product_id: item.product_id,
+        created_at: item.created_at,
+        product: {
+          id: item.id || item.product_id,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          compare_price: item.compare_price || null,
+          slug: item.slug,
+          image_url: item.image_url,
+          category_id: item.category_id,
+          rating: item.rating || 0,
+          review_count: item.review_count || 0,
+          stock: item.stock,
+          featured: item.featured || false,
+          created_at: item.created_at,
+        } as Product
+      })) as WishlistItem[];
+      setItems(transformed);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        signOut();
+      }
+      console.error('Error fetching wishlist:', err);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchWishlist(); }, []);
+  useEffect(() => {
+    fetchWishlist();
+  }, [user]);
 
   const toggleWishlist = async (productId: string) => {
-    const existing = items.find(i => i.product_id === productId);
-    const wishlistStore = getWishlistStore();
-    if (existing) {
-      wishlistStore[guestId] = (wishlistStore[guestId] ?? []).filter((item: { id: string }) => item.id !== existing.id);
-      saveWishlistStore(wishlistStore);
-      setItems(prev => prev.filter(i => i.id !== existing.id));
-    } else {
-      wishlistStore[guestId] = [
-        ...(wishlistStore[guestId] ?? []),
-        { id: createId('wish'), user_id: guestId, product_id: productId, created_at: new Date().toISOString() },
-      ];
-      saveWishlistStore(wishlistStore);
-      fetchWishlist();
+    if (!user) {
+      const err = new Error('PLEASE_LOGIN');
+      (err as any).requiresLogin = true;
+      throw err;
+    }
+    try {
+      const existing = items.find(i => i.product_id === productId);
+      if (existing) {
+        await api.delete(`wishlist/remove/${existing.id}`);
+        setItems(prev => prev.filter(i => i.id !== existing.id));
+      } else {
+        await api.post('wishlist/add', { productId });
+        await fetchWishlist();
+      }
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        signOut();
+      }
+      console.error('Error toggling wishlist:', err);
+      throw err;
     }
   };
 

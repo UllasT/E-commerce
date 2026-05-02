@@ -1,5 +1,5 @@
 import Router from 'express'
-import { CreateProduct, DeleteProduct, GetProductsById, GetUserProducts, UpdateProduct } from '../controller/product.controller.js'
+import { CreateProduct, DeleteProduct, GetProductsById, GetUserProducts, SearchProducts, UpdateProduct, GetProductBySlug } from '../controller/product.controller.js'
 import authMiddleware from '../middleware/auth.middleware.js'
 
 
@@ -9,11 +9,19 @@ import authMiddleware from '../middleware/auth.middleware.js'
 
 const router = Router()
 
-router.get('/user',authMiddleware,GetUserProducts)
-router.post('/create',authMiddleware,CreateProduct)
-router.get('/:id',GetProductsById)
-router.delete('/delete/:id',authMiddleware,DeleteProduct)
-router.put('/update/:id',authMiddleware,UpdateProduct)
+// Specific routes first (before :id catch-all)
+router.get('/search', SearchProducts)
+router.get('/user', authMiddleware, GetUserProducts)
+router.get('/slug/:slug', GetProductBySlug)
+
+// Post/Put/Delete
+router.post('/create', authMiddleware, CreateProduct)
+router.put('/update/:id', authMiddleware, UpdateProduct)
+router.delete('/delete/:id', authMiddleware, DeleteProduct)
+
+// Generic routes last
+router.get('/:id', GetProductsById)
+router.get('/', SearchProducts)
 
 
 

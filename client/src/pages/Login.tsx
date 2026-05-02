@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 type LoginForm = {
 	email: string;
@@ -22,6 +23,9 @@ export default function Login() {
 	const [form, setForm] = useState<LoginForm>(initialForm);
 	const [errors, setErrors] = useState<FormErrors>({});
 	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const navigate = useNavigate();
+	const { signIn } = useAuth();
 
 	const validate = () => {
 		const nextErrors: FormErrors = {};
@@ -53,20 +57,14 @@ export default function Login() {
 			setIsSubmitting(true);
 			setErrors({});
 
-			const response = await fetch('/api/sql/users/login', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					email: form.email.trim(),
-					password: form.password,
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error('Invalid credentials or login endpoint is not ready');
+			const result = await signIn(form.email.trim(), form.password);
+			if (result.error) {
+				setErrors({ submit: result.error });
+				return;
 			}
 
 			setForm(initialForm);
+			navigate('/');
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			setErrors({ submit: message });

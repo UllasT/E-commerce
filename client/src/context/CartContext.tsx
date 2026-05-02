@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { CartItem, Product } from '../types';
-import { createId, getCartStore, getProductById, saveCartStore } from '../lib/localStore';
+import api from '../lib/api';
+import { useAuth } from './AuthContext';
 
 interface CartContextType {
   items: CartItem[];
@@ -18,60 +19,119 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const guestId = 'guest';
+  const { user, signOut } = useAuth();
 
   const fetchCart = async () => {
+    if (!user) {
+      setItems([]);
+      return;
+    }
     setLoading(true);
-    const cart = getCartStore()[guestId] ?? [];
-    setItems(
-      cart
-        .map((item: { id: string; user_id: string; product_id: string; quantity: number; created_at: string }) => {
-          const product = getProductById(item.product_id);
-          return product ? { ...item, product } : null;
-        })
-        .filter(Boolean) as (CartItem & { product: Product })[]
-    );
-    setLoading(false);
+    try {
+      const res = await api.get('cart');
+      const cartItems = res.data || [];
+      // Transform backend response to CartItem format
+      const transformed = cartItems.map((item: any) => ({
+        id: item.id,
+        user_id: item.user_id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        created_at: item.created_at,
+        product: {
+          id: item.product_id,  // Fix: use product_id, not item.id
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          compare_price: item.compare_price || null,
+          slug: item.slug,
+          image_url: item.image_url,
+          category_id: item.category_id,
+          rating: item.rating || 0,
+          review_count: item.review_count || 0,
+          stock: item.stock,
+          featured: item.featured || false,
+          created_at: item.created_at,
+        } as Product
+      })) as CartItem[];
+      setItems(transformed);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        signOut();
+      }
+      console.error('Error fetching cart:', err);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchCart(); }, []);
+  useEffect(() => {
+    fetchCart();
+  }, [user]);
 
   const addToCart = async (productId: string) => {
-    const existing = items.find(i => i.product_id === productId);
-    if (existing) {
-      await updateQuantity(existing.id, existing.quantity + 1);
-    } else {
-      const cartStore = getCartStore();
-      const userCart = cartStore[guestId] ?? [];
-      userCart.push({ id: createId('cart'), user_id: guestId, product_id: productId, quantity: 1, created_at: new Date().toISOString() });
-      cartStore[guestId] = userCart;
-      saveCartStore(cartStore);
-      fetchCart();
+    if (!user) {
+      const err = new Error('PLEASE_LOGIN');
+      (err as any).requiresLogin = true;
+      throw err;
+    }
+    try {
+      const res = await api.post('cart/add', { productId, quantity: 1 });
+      console.log('Add to cart response:', res.data);
+      await fetchCart();
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        signOut();
+      }
+      console.error('Backend error response:', err.response?.data);
+      console.error('Error adding to cart:', err.response?.data?.message || err.message);
+      throw err;
     }
   };
 
   const removeFromCart = async (itemId: string) => {
-    const cartStore = getCartStore();
-    cartStore[guestId] = (cartStore[guestId] ?? []).filter((item: { id: string }) => item.id !== itemId);
-    saveCartStore(cartStore);
-    setItems(prev => prev.filter(i => i.id !== itemId));
+    try {
+      await api.delete(`cart/remove/${itemId}`);
+      setItems(prev => prev.filter(i => i.id !== itemId));
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        signOut();
+      }
+      console.error('Error removing from cart:', err);
+      throw err;
+    }
   };
 
   const updateQuantity = async (itemId: string, quantity: number) => {
-    if (quantity < 1) { await removeFromCart(itemId); return; }
-    const cartStore = getCartStore();
-    cartStore[guestId] = (cartStore[guestId] ?? []).map((item: { id: string; user_id: string; product_id: string; quantity: number; created_at: string }) => (
-      item.id === itemId ? { ...item, quantity } : item
-    ));
-    saveCartStore(cartStore);
-    setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
+    if (quantity < 1) {
+      await removeFromCart(itemId);
+      return;
+    }
+    try {
+      await api.put(`cart/update/${itemId}`, { quantity });
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        signOut();
+      }
+      console.error('Error updating quantity:', err);
+      throw err;
+    }
   };
 
   const clearCart = async () => {
-    const cartStore = getCartStore();
-    cartStore[guestId] = [];
-    saveCartStore(cartStore);
-    setItems([]);
+    try {
+      for (const item of items) {
+        await api.delete(`cart/remove/${item.id}`);
+      }
+      setItems([]);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        signOut();
+      }
+      console.error('Error clearing cart:', err);
+      throw err;
+    }
   };
 
   const cartTotal = items.reduce((sum, i) => sum + (i.product?.price ?? 0) * i.quantity, 0);

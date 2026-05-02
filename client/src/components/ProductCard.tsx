@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Heart, ShoppingCart, Star } from 'lucide-react';
 import type { Product } from '../types';
 import { useCart } from '../context/CartContext';
@@ -21,19 +21,32 @@ function Stars({ rating }: { rating: number }) {
 }
 
 export default function ProductCard({ product }: { product: Product }) {
+  const navigate = useNavigate();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addToCart(product.id);
+    try {
+      await addToCart(product.id);
+    } catch (err: any) {
+      if (err.message === 'PLEASE_LOGIN') {
+        navigate('/login');
+      }
+    }
   };
 
-  const handleWishlist = (e: React.MouseEvent) => {
+  const handleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleWishlist(product.id);
+    try {
+      await toggleWishlist(product.id);
+    } catch (err: any) {
+      if (err.message === 'PLEASE_LOGIN') {
+        navigate('/login');
+      }
+    }
   };
 
   return (
@@ -72,3 +85,4 @@ export default function ProductCard({ product }: { product: Product }) {
     </div>
   );
 }
+
