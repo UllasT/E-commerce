@@ -340,6 +340,7 @@ Each controller is summarized below in a report-style table so the SQL path and 
 | Create order | `INSERT INTO orders (user_id, order_number, status, total_amount, shipping_address, payment_method, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?)` | `new Order(...).save()` | Save the order header. |
 | Resolve new order id | `SELECT id FROM orders WHERE order_number = ? AND user_id = ? LIMIT 1` | `order._id` | Get the created order id. |
 | Create order items | `INSERT INTO order_items (order_id, product_id, product_name, product_image, price, quantity) VALUES (?, ?, ?, ?, ?, ?)` | `new OrderItem(...).save()` | Save line items. |
+| Reduce stock | `BEFORE INSERT` trigger on `order_items` decrements `products.stock` | `findOneAndUpdate({ _id: it.product_id, stock: { $gte: it.quantity } }, { $inc: { stock: -it.quantity } })` | Reduce product stock after the order is placed. |
 | Clear cart | `DELETE FROM cart_items WHERE user_id = ?` | `cartitemSchema.deleteMany({ user_id: userId })` | Empty the cart after checkout. |
 | List orders | `SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC` | `Order.find({ user_id: userId }).sort({ createdAt: -1 }).lean()` | Return user orders newest first. |
 | Load order items | `SELECT * FROM order_items WHERE order_id = ?` | `OrderItem.find({ order_id: ... }).lean()` | Attach items to each order. |

@@ -175,4 +175,33 @@ CREATE TABLE IF NOT EXISTS order_items (
     ON DELETE CASCADE
 );
 
+DROP TRIGGER IF EXISTS before_order_items_insert_reduce_stock;
+DELIMITER //
+CREATE TRIGGER before_order_items_insert_reduce_stock
+BEFORE INSERT ON order_items
+FOR EACH ROW
+BEGIN
+  DECLARE available_stock INT;
+
+  SELECT stock INTO available_stock
+  FROM products
+  WHERE id = NEW.product_id
+  FOR UPDATE;
+
+  IF available_stock IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Product not found';
+  END IF;
+
+  IF available_stock < NEW.quantity THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Insufficient stock';
+  END IF;
+
+  UPDATE products
+  SET stock = stock - NEW.quantity
+  WHERE id = NEW.product_id;
+END//
+DELIMITER ;
+
 

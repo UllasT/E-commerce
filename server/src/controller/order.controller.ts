@@ -63,6 +63,8 @@ const CreateOrder = async (req: any, res: any) => {
       if (conn) conn.release();
     }
   } else if (DATABASE_TYPE === 'mongodb') {
+    let order: any;
+    const decrementedStock: Array<{ product_id: any; quantity: number }> = [];
     try {
       // validate products and compute total
       let total = 0;
@@ -77,7 +79,7 @@ const CreateOrder = async (req: any, res: any) => {
         validatedItems.push({ product_id: prod._id, product_name: prod.name, product_image: prod.image_url || null, price: prod.price || 0, quantity: qty });
       }
 
-      const order = new Order({ user_id: userId, order_number: `ORD-${Date.now()}`, status: 'pending', total_amount: total, shipping_address: shipping_address || {}, payment_method: payment_method || 'cod', payment_status: 'pending' });
+      order = new Order({ user_id: userId, order_number: `ORD-${Date.now()}`, status: 'pending', total_amount: total, shipping_address: shipping_address || {}, payment_method: payment_method || 'cod', payment_status: 'pending' });
       await order.save();
 
       const createdItems = [];
@@ -85,12 +87,40 @@ const CreateOrder = async (req: any, res: any) => {
         const oi = new OrderItem({ order_id: order._id, product_id: it.product_id, product_name: it.product_name, product_image: it.product_image, price: it.price, quantity: it.quantity });
         await oi.save();
         createdItems.push(oi);
+
+        const updatedProduct = await productSchema.findOneAndUpdate(
+          { _id: it.product_id, stock: { $gte: it.quantity } },
+          { $inc: { stock: -it.quantity } },
+          { new: true }
+        );
+
+        if (!updatedProduct) {
+          throw new Error(`Insufficient stock for product ${it.product_id}`);
+        }
+
+        decrementedStock.push({ product_id: it.product_id, quantity: it.quantity });
       }
 
       await cartitemSchema.deleteMany({ user_id: userId });
 
       res.status(201).json({ message: 'Order created', id: order._id, order_number: order.order_number, total: order.total_amount, items: createdItems });
     } catch (error) {
+      if (decrementedStock.length > 0) {
+        await Promise.all(
+          decrementedStock.map(({ product_id, quantity }) =>
+            productSchema.updateOne({ _id: product_id }, { $inc: { stock: quantity } })
+          )
+        );
+      }
+
+      if ((error as any)?.message?.startsWith('Insufficient stock')) {
+        return res.status(400).json({ message: 'Out of stock' });
+      }
+
+      if (order?._id) {
+        await OrderItem.deleteMany({ order_id: order._id });
+        await Order.deleteOne({ _id: order._id, user_id: userId });
+      }
       console.error('Error creating MongoDB order:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
