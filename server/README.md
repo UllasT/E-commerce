@@ -137,57 +137,57 @@ erDiagram
 	ORDERS ||--o{ ORDER_ITEMS : contains
 
 	USERS {
-		id PK
-		full_name
-		email UK
+		string id PK
+		string full_name
+		string email UK
 	}
 
 	CATEGORIES {
-		id PK
-		name UK
-		slug UK
+		string id PK
+		string name UK
+		string slug UK
 	}
 
 	PRODUCTS {
-		id PK
-		name
-		slug UK
-		category_id FK
-		stock
+		string id PK
+		string name
+		string slug UK
+		string category_id FK
+		int stock
 	}
 
 	CART_ITEMS {
-		id PK
-		user_id FK
-		product_id FK
-		quantity
+		string id PK
+		string user_id FK
+		string product_id FK
+		int quantity
 	}
 
 	WISHLIST_ITEMS {
-		id PK
-		user_id FK
-		product_id FK
+		string id PK
+		string user_id FK
+		string product_id FK
 	}
 
 	ADDRESSES {
-		id PK
-		user_id FK
-		city
-		country
+		string id PK
+		string user_id FK
+		string city
+		string country
 	}
 
 	ORDERS {
-		id PK
-		user_id FK
-		order_number UK
-		status
+		string id PK
+		string user_id FK
+		string order_number UK
+		string status
 	}
 
 	ORDER_ITEMS {
-		id PK
-		order_id FK
-		product_id FK
-		quantity
+		string id PK
+		string order_id FK
+		string product_id FK
+		int quantity
 	}
 ```
 
@@ -208,57 +208,57 @@ erDiagram
 	ORDER ||--o{ ORDER_ITEM : contains
 
 	USER {
-		_id PK
-		full_name
-		email UK
+		string _id PK
+		string full_name
+		string email UK
 	}
 
 	CATEGORY {
-		_id PK
-		name UK
-		slug UK
+		string _id PK
+		string name UK
+		string slug UK
 	}
 
 	PRODUCT {
-		_id PK
-		name
-		slug UK
-		category_id FK
-		userid FK
+		string _id PK
+		string name
+		string slug UK
+		string category_id FK
+		string userid FK
 	}
 
 	CART_ITEM {
-		_id PK
-		user_id FK
-		product_id FK
-		quantity
+		string _id PK
+		string user_id FK
+		string product_id FK
+		int quantity
 	}
 
 	WISHLIST_ITEM {
-		_id PK
-		user_id FK
-		product_id FK
+		string _id PK
+		string user_id FK
+		string product_id FK
 	}
 
 	ADDRESS {
-		_id PK
-		user_id FK
-		city
-		country
+		string _id PK
+		string user_id FK
+		string city
+		string country
 	}
 
 	ORDER {
-		_id PK
-		user_id FK
-		order_number UK
-		status
+		string _id PK
+		string user_id FK
+		string order_number UK
+		string status
 	}
 
 	ORDER_ITEM {
-		_id PK
-		order_id FK
-		product_id FK
-		quantity
+		string _id PK
+		string order_id FK
+		string product_id FK
+		int quantity
 	}
 ```
 
