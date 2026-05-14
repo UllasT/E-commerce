@@ -358,3 +358,73 @@ The current SQL controller for products writes a `userid` column, while the atta
 - Set `DATA_BASE_TYPE=sql` to use the SQL connection path.
 - Set `DATA_BASE_TYPE=mongodb` to use the MongoDB connection path.
 - The MongoDB connection error shown above usually means MongoDB is not running locally on port `27017`.
+
+## SQL Trigger: automatic stock reduction on order
+
+The project now includes a SQL trigger that automatically reduces the `products.stock` when new rows are inserted into `order_items`. Paste or apply the following snippet to your MySQL/MariaDB database (or run the `Schema.sql` file) so the trigger is created.
+
+```sql
+DROP TRIGGER IF EXISTS before_order_items_insert_reduce_stock;
+DELIMITER //
+CREATE TRIGGER before_order_items_insert_reduce_stock
+BEFORE INSERT ON order_items
+FOR EACH ROW
+BEGIN
+	DECLARE available_stock INT;
+
+	SELECT stock INTO available_stock
+	FROM products
+	WHERE id = NEW.product_id
+	FOR UPDATE;
+
+	IF available_stock IS NULL THEN
+		SIGNAL SQLSTATE '45000'
+			SET MESSAGE_TEXT = 'Product not found';
+	END IF;
+
+	IF available_stock < NEW.quantity THEN
+		SIGNAL SQLSTATE '45000'
+			SET MESSAGE_TEXT = 'Insufficient stock';
+	END IF;
+
+	UPDATE products
+	SET stock = stock - NEW.quantity
+	WHERE id = NEW.product_id;
+END//
+DELIMITER ;
+```
+
+Line-by-line explanation
+
+1. DROP TRIGGER IF EXISTS before_order_items_insert_reduce_stock; — Remove any existing trigger with the same name so the script can be re-run safely.
+2. DELIMITER // — Change the statement delimiter so the trigger body can contain semicolons without ending the CREATE TRIGGER statement.
+3. CREATE TRIGGER before_order_items_insert_reduce_stock — Start creating a trigger named `before_order_items_insert_reduce_stock`.
+4. BEFORE INSERT ON order_items — The trigger runs before a new row is inserted into the `order_items` table.
+5. FOR EACH ROW — Execute the trigger body for each row being inserted.
+6. BEGIN — Begin the trigger body block.
+7. DECLARE available_stock INT; — Declare a local variable to hold the current stock value for the target product.
+8. SELECT stock INTO available_stock — Read the current `stock` value into the variable.
+9. FROM products — Select from the `products` table.
+10. WHERE id = NEW.product_id — Match the product row whose id equals the `product_id` in the row being inserted (`NEW.product_id`).
+11. FOR UPDATE; — Lock the selected product row for update to prevent race conditions (within transactions).
+12. IF available_stock IS NULL THEN — If no product row was found, `available_stock` will be NULL.
+13. SIGNAL SQLSTATE '45000' — Raise a generic user-defined SQL error to abort the insert.
+14. SET MESSAGE_TEXT = 'Product not found'; — Provide an explanatory error message for the raised error.
+15. END IF; — Close the IF for missing product.
+16. IF available_stock < NEW.quantity THEN — If the current stock is less than the quantity being ordered, we cannot fulfill it.
+17. SIGNAL SQLSTATE '45000' — Raise an error to abort the insert when stock is insufficient.
+18. SET MESSAGE_TEXT = 'Insufficient stock'; — Error message explaining why the insert failed.
+19. END IF; — Close the IF for insufficient stock.
+20. UPDATE products — Begin updating the products table.
+21. SET stock = stock - NEW.quantity — Subtract the ordered quantity from the product's stock.
+22. WHERE id = NEW.product_id; — Apply the update to the matched product row.
+23. END// — End the trigger body (matching the custom delimiter `//`).
+24. DELIMITER ; — Restore the default SQL statement delimiter.
+
+Notes and operational guidance
+
+- The trigger uses row-level locking (`FOR UPDATE`) to reduce race conditions when multiple orders are created concurrently. It assumes inserts into `order_items` occur inside a transaction that also inserts the `orders` row (the SQL controller uses transactions for order creation).
+- If the trigger raises the `Product not found` or `Insufficient stock` error, the surrounding transaction should be rolled back and the order creation will fail. Ensure your application logic handles these errors and returns appropriate responses to clients.
+- For MongoDB we implement the same behavior in application code (see `src/controller/order.controller.ts`) because MongoDB does not support equivalent triggers in the same way.
+
+If you'd like, I can also add an explicit migration or a small script to create the trigger in your database automatically.
